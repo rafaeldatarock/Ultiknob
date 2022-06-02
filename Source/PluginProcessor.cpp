@@ -19,7 +19,7 @@ UltiknobAudioProcessor::UltiknobAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ), params (*this, nullptr, "Parameters", createParameters())
 #endif
 {
 }
@@ -189,8 +189,10 @@ void UltiknobAudioProcessor::readBuffer(
     juce::AudioBuffer<float>& buffer, 
     juce::AudioBuffer<float>& delayBuffer)
 {
-    // a readPosition equal to sampleRate is a delay of 1 second
-    auto readPosition = writePosition - (getSampleRate() / 2);
+    // the delaytime is in samples (0 - 10.000)
+    auto* delayTime = params.getRawParameterValue("DELAYTIME");
+
+    auto readPosition = writePosition - (delayTime->load());
 
     // if writeposition is 0, our readPosition would be negative
     // to solve this we need this to wrap, similar to the delaybuffer
@@ -222,7 +224,8 @@ bool UltiknobAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* UltiknobAudioProcessor::createEditor()
 {
-    return new UltiknobAudioProcessorEditor (*this);
+    return new juce::GenericAudioProcessorEditor(*this);
+    //return new UltiknobAudioProcessorEditor (*this);
 }
 
 //==============================================================================
@@ -244,4 +247,13 @@ void UltiknobAudioProcessor::setStateInformation (const void* data, int sizeInBy
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new UltiknobAudioProcessor();
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::createParameters()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.0f, 10'000.0f, 0.0f));
+
+    return { params.begin(), params.end() };
 }

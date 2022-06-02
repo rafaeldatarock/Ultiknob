@@ -63,6 +63,8 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
     juce::AudioProcessorValueTreeState params;
 
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> delayTime{ 0.0f };
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (UltiknobAudioProcessor)
 };

@@ -93,9 +93,11 @@ void UltiknobAudioProcessor::changeProgramName (int index, const juce::String& n
 //==============================================================================
 void UltiknobAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    auto delayBufferSize = 2 * sampleRate; // 2 second delay buffer
+    // buffersize is equal to samplerate, so this buffer is 1 second long
+    delayBuffer.setSize(getTotalNumInputChannels(), (int) sampleRate);
 
-    delayBuffer.setSize(getTotalNumInputChannels(), (int) delayBufferSize);
+    // reset the values for smoothing of delaytime
+    delayTime.reset(sampleRate, 0.5);
 }
 
 void UltiknobAudioProcessor::releaseResources()
@@ -190,29 +192,31 @@ void UltiknobAudioProcessor::readBuffer(
     juce::AudioBuffer<float>& delayBuffer)
 {
     // the delaytime is in samples (0 - 10.000)
-    auto* delayTime = params.getRawParameterValue("DELAYTIME");
+    auto delayTimeSlider = params.getRawParameterValue("DELAYTIME")->load();
+    delayTime.setTargetValue(delayTimeSlider);
 
-    auto readPosition = writePosition - (delayTime->load());
+    auto readPosition = writePosition - delayTime.skip(bufferSize);
+    //auto readPosition = writePosition - delayTime.getNextValue();
 
     // if writeposition is 0, our readPosition would be negative
     // to solve this we need this to wrap, similar to the delaybuffer
     if (readPosition < 0)
         readPosition += delayBufferSize;
 
-    auto gain = 0.7f;
+    auto gain = 1.0f;
 
     // in this case the readPos and buffer are within bounds of the delayBuffer
     if (readPosition + bufferSize < delayBufferSize)
     {
-        buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize, gain, gain);
+        buffer.copyFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize, gain, gain);
     }
     else
     {
         auto samplesToEnd = delayBufferSize - readPosition;
-        buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), samplesToEnd, gain, gain);
+        buffer.copyFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), samplesToEnd, gain, gain);
 
         auto samplesAtStart = bufferSize - samplesToEnd;
-        buffer.addFromWithRamp(channel, samplesToEnd, delayBuffer.getReadPointer(channel, 0), samplesAtStart, gain, gain);
+        buffer.copyFromWithRamp(channel, samplesToEnd, delayBuffer.getReadPointer(channel, 0), samplesAtStart, gain, gain);
     }
 }
 

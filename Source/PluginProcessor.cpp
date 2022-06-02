@@ -145,7 +145,9 @@ void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto* channelData = buffer.getWritePointer(channel);
+
         fillBuffer(channel, bufferSize, delayBufferSize, channelData);
+        readBuffer(channel, bufferSize, delayBufferSize, buffer, delayBuffer);
     }
 
     // to make sure to copy next value from mainbuffer to the right location in the delaybuffer
@@ -154,12 +156,16 @@ void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     writePosition %= delayBufferSize; 
 }
 
-void UltiknobAudioProcessor::fillBuffer(int channel, int bufferSize, int delayBufferSize, float* channelData)
+void UltiknobAudioProcessor::fillBuffer(
+    int channel, 
+    int bufferSize, 
+    int delayBufferSize, 
+    float* channelData)
 {
     // copy data from main buffer to delay buffer
     if (delayBufferSize > bufferSize + writePosition)
     {
-        delayBuffer.copyFromWithRamp(channel, writePosition, channelData, bufferSize, 0.1f, 0.1f);
+        delayBuffer.copyFrom(channel, writePosition, channelData, bufferSize);
     }
     else// we are at the end of the delaybuffer
     // make sure to wrap around and completely fill up delaybuffer
@@ -167,12 +173,44 @@ void UltiknobAudioProcessor::fillBuffer(int channel, int bufferSize, int delayBu
         // how many samples are left until the end of the buffer
         auto samplesToEnd = delayBufferSize - writePosition;
         // fill up buffer
-        delayBuffer.copyFromWithRamp(channel, writePosition, channelData, samplesToEnd, 0.1f, 0.1f);
+        delayBuffer.copyFrom(channel, writePosition, channelData, samplesToEnd);
 
         // how many samples end up at the start of the buffer (those overwrite the start of the buffer)
         auto samplesAtStart = bufferSize - samplesToEnd;
         // go back to beginning of buffer and overwrite it at position 0, with the rest of the bufferdata that didn't fit at the end
-        delayBuffer.copyFromWithRamp(channel, 0, channelData + samplesToEnd, samplesAtStart, 0.1f, 0.1f);
+        delayBuffer.copyFrom(channel, 0, channelData + samplesToEnd, samplesAtStart);
+    }
+}
+
+void UltiknobAudioProcessor::readBuffer(
+    int channel, 
+    int bufferSize, 
+    int delayBufferSize, 
+    juce::AudioBuffer<float>& buffer, 
+    juce::AudioBuffer<float>& delayBuffer)
+{
+    // a readPosition equal to sampleRate is a delay of 1 second
+    auto readPosition = writePosition - (getSampleRate() / 2);
+
+    // if writeposition is 0, our readPosition would be negative
+    // to solve this we need this to wrap, similar to the delaybuffer
+    if (readPosition < 0)
+        readPosition += delayBufferSize;
+
+    auto gain = 0.7f;
+
+    // in this case the readPos and buffer are within bounds of the delayBuffer
+    if (readPosition + bufferSize < delayBufferSize)
+    {
+        buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize, gain, gain);
+    }
+    else
+    {
+        auto samplesToEnd = delayBufferSize - readPosition;
+        buffer.addFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), samplesToEnd, gain, gain);
+
+        auto samplesAtStart = bufferSize - samplesToEnd;
+        buffer.addFromWithRamp(channel, samplesToEnd, delayBuffer.getReadPointer(channel, 0), samplesAtStart, gain, gain);
     }
 }
 

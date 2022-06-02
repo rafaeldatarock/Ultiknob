@@ -56,6 +56,8 @@ public:
 private:
     void fillBuffer(int channel, int bufferSize, int delayBufferSize, float* channelData);
 
+    void readBuffer(int channel, int bufferSize, int delayBufferSize, juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer);
+
     juce::AudioBuffer<float> delayBuffer;
     int writePosition{ 0 };
 

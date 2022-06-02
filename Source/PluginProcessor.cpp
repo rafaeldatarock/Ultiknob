@@ -146,29 +146,34 @@ void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     {
         auto* channelData = buffer.getWritePointer(channel);
 
-        // copy data from main buffer to delay buffer
-        if (delayBufferSize > bufferSize + writePosition)
-        {
-            delayBuffer.copyFromWithRamp(channel, writePosition, channelData, bufferSize, 0.1f, 0.1f);
-        }
-        else// we are at the end of the delaybuffer
-        // make sure to wrap around and completely fill up delaybuffer
-        {
-            // how many samples are left until the end of the buffer
-            auto samplesToEnd = delayBufferSize - writePosition;
-            // fill up buffer
-            delayBuffer.copyFromWithRamp(channel, writePosition, channelData, samplesToEnd, 0.1f, 0.1f);
-
-            // how many samples end up at the start of the buffer (those overwrite the start of the buffer)
-            auto samplesAtStart = bufferSize - samplesToEnd;
-            // go back to beginning of buffer and overwrite it at position 0, with the rest of the bufferdata that didn't fit at the end
-            delayBuffer.copyFromWithRamp(channel, 0, channelData + samplesToEnd, samplesAtStart, 0.1f, 0.1f);
-        }
+        fillBuffer(channel, bufferSize, delayBufferSize, channelData);
 
         // to make sure to copy next value from mainbuffer to the right location in the delaybuffer
         writePosition += bufferSize;
         // to make sure to wrap around when getting to the end of the delaybuffer
-        writePosition %= delayBufferSize;
+        writePosition %= delayBufferSize; 
+    }
+}
+
+void UltiknobAudioProcessor::fillBuffer(int channel, int bufferSize, int delayBufferSize, float* channelData)
+{
+    // copy data from main buffer to delay buffer
+    if (delayBufferSize > bufferSize + writePosition)
+    {
+        delayBuffer.copyFromWithRamp(channel, writePosition, channelData, bufferSize, 0.1f, 0.1f);
+    }
+    else// we are at the end of the delaybuffer
+    // make sure to wrap around and completely fill up delaybuffer
+    {
+        // how many samples are left until the end of the buffer
+        auto samplesToEnd = delayBufferSize - writePosition;
+        // fill up buffer
+        delayBuffer.copyFromWithRamp(channel, writePosition, channelData, samplesToEnd, 0.1f, 0.1f);
+
+        // how many samples end up at the start of the buffer (those overwrite the start of the buffer)
+        auto samplesAtStart = bufferSize - samplesToEnd;
+        // go back to beginning of buffer and overwrite it at position 0, with the rest of the bufferdata that didn't fit at the end
+        delayBuffer.copyFromWithRamp(channel, 0, channelData + samplesToEnd, samplesAtStart, 0.1f, 0.1f);
     }
 }
 

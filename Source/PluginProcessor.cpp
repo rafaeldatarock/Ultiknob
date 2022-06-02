@@ -145,14 +145,13 @@ void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto* channelData = buffer.getWritePointer(channel);
-
         fillBuffer(channel, bufferSize, delayBufferSize, channelData);
-
-        // to make sure to copy next value from mainbuffer to the right location in the delaybuffer
-        writePosition += bufferSize;
-        // to make sure to wrap around when getting to the end of the delaybuffer
-        writePosition %= delayBufferSize; 
     }
+
+    // to make sure to copy next value from mainbuffer to the right location in the delaybuffer
+    writePosition += bufferSize;
+    // to make sure to wrap around when getting to the end of the delaybuffer
+    writePosition %= delayBufferSize; 
 }
 
 void UltiknobAudioProcessor::fillBuffer(int channel, int bufferSize, int delayBufferSize, float* channelData)

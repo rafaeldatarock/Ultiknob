@@ -97,7 +97,7 @@ void UltiknobAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
     delayBuffer.setSize(getTotalNumInputChannels(), (int) sampleRate);
 
     // reset the values for smoothing of delaytime
-    delayTime.reset(sampleRate, 0.5);
+    delayTime.reset(sampleRate, 0.9);
 }
 
 void UltiknobAudioProcessor::releaseResources()
@@ -191,32 +191,29 @@ void UltiknobAudioProcessor::readBuffer(
     juce::AudioBuffer<float>& buffer, 
     juce::AudioBuffer<float>& delayBuffer)
 {
-    // the delaytime is in samples (0 - 10.000)
+    // the delaytime is in samples (0 - 1000)
     auto delayTimeSlider = params.getRawParameterValue("DELAYTIME")->load();
     delayTime.setTargetValue(delayTimeSlider);
 
     auto readPosition = writePosition - delayTime.skip(bufferSize);
-    //auto readPosition = writePosition - delayTime.getNextValue();
 
     // if writeposition is 0, our readPosition would be negative
     // to solve this we need this to wrap, similar to the delaybuffer
     if (readPosition < 0)
         readPosition += delayBufferSize;
 
-    auto gain = 1.0f;
-
     // in this case the readPos and buffer are within bounds of the delayBuffer
     if (readPosition + bufferSize < delayBufferSize)
     {
-        buffer.copyFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize, gain, gain);
+        buffer.copyFrom(channel, 0, delayBuffer.getReadPointer(channel, readPosition), bufferSize);
     }
     else
     {
         auto samplesToEnd = delayBufferSize - readPosition;
-        buffer.copyFromWithRamp(channel, 0, delayBuffer.getReadPointer(channel, readPosition), samplesToEnd, gain, gain);
+        buffer.copyFrom(channel, 0, delayBuffer.getReadPointer(channel, readPosition), samplesToEnd);
 
         auto samplesAtStart = bufferSize - samplesToEnd;
-        buffer.copyFromWithRamp(channel, samplesToEnd, delayBuffer.getReadPointer(channel, 0), samplesAtStart, gain, gain);
+        buffer.copyFrom(channel, samplesToEnd, delayBuffer.getReadPointer(channel, 0), samplesAtStart);
     }
 }
 
@@ -257,7 +254,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.0f, 10'000.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.0f, 1000.0f, 0.0f));
 
     return { params.begin(), params.end() };
 }

@@ -54,16 +54,12 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
 private:
-    void fillBuffer(int channel, int bufferSize, int delayBufferSize, float* channelData);
-    void readBuffer(int channel, int bufferSize, int delayBufferSize, juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& delayBuffer);
-
-    juce::AudioBuffer<float> delayBuffer;
-    int writePosition{ 0 };
-
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
     juce::AudioProcessorValueTreeState params;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> delayTime{ 0.0f };
+
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Thiran> lagrange;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (UltiknobAudioProcessor)

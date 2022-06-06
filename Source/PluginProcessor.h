@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "Delay.h"
 #include <JuceHeader.h>
 
 //==============================================================================
@@ -57,11 +58,7 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
     juce::AudioProcessorValueTreeState params;
 
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> delayTime{ 0.0f };
-
-    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Thiran> delayLine;
-
-    juce::dsp::Oversampling<float> oversampler;
+    dsp::Delay delay;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (UltiknobAudioProcessor)

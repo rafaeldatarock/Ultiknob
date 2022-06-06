@@ -19,9 +19,9 @@ UltiknobAudioProcessor::UltiknobAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       ), 
+                       ),
     params (*this, nullptr, "Parameters", createParameters()),
-    oversampler(2, 2, juce::dsp::Oversampling<float>::FilterType::filterHalfBandFIREquiripple)
+    delay()
 #endif
 {
 }
@@ -95,24 +95,9 @@ void UltiknobAudioProcessor::changeProgramName (int index, const juce::String& n
 //==============================================================================
 void UltiknobAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    double oversamplingRate = sampleRate * oversampler.getOversamplingFactor();
-    int oversamplesPerBlock = samplesPerBlock * (int)oversampler.getOversamplingFactor();
-
-    // reset the values for smoothing of delayTime
-    delayTime.reset(oversamplingRate, 2.0);
-    delayTime.setCurrentAndTargetValue(params.getRawParameterValue("DELAYTIME")->load());
-
-    // prepare the delayLine
-    juce::dsp::ProcessSpec spec;
-    spec.sampleRate = oversamplingRate;
-    spec.maximumBlockSize = oversamplesPerBlock;
-    spec.numChannels = getTotalNumOutputChannels();
-
-    delayLine.prepare(spec);
-    delayLine.setMaximumDelayInSamples((2000 * (int)oversampler.getOversamplingFactor()) + oversamplesPerBlock);
-
-    oversampler.reset();
-    oversampler.initProcessing(static_cast<size_t>(samplesPerBlock));
+    // bufferLengthInMs should be at least 1 greater than the maximum slider value the user can set
+    // if slider is set to exactly the maximum buffersize, the delay has no effect
+    delay.prepare(sampleRate, samplesPerBlock, 1001.);
 }
 
 void UltiknobAudioProcessor::releaseResources()
@@ -149,33 +134,13 @@ bool UltiknobAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
 
 void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
-    const int bufferSize{ buffer.getNumSamples() };
+    delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
 
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, bufferSize);
-
-    delayTime.setTargetValue(params.getRawParameterValue("DELAYTIME")->load());
-
-    juce::dsp::AudioBlock<float> audioBlock{ buffer };
-    juce::dsp::AudioBlock<float> upsampledBlock;
-
-    upsampledBlock = oversampler.processSamplesUp(audioBlock);
- 
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        float* upsampledBlockPointer = upsampledBlock.getChannelPointer(channel);
-
-        for (auto s = 0; s < upsampledBlock.getNumSamples(); ++s)
-        {
-            delayLine.pushSample(channel, upsampledBlockPointer[s]);
-            upsampledBlockPointer[s] = delayLine.popSample(channel, delayTime.getNextValue(), true);
-        }
-    }
-
-    oversampler.processSamplesDown(audioBlock);
+    delay.processBlock(
+        buffer.getArrayOfWritePointers(),
+        buffer.getNumChannels(),
+        buffer.getNumSamples()
+    );
 }
 
 //==============================================================================
@@ -215,7 +180,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.0f, 8'000.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.f, 1'000.0f, 0.0f));
 
     return { params.begin(), params.end() };
 }

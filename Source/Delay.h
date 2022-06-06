@@ -3,6 +3,18 @@
 #include <vector>
 #include <JuceHeader.h>
 
+namespace interpolation
+{
+	inline float linearInterpolation(float* bufferChannel, float readPos, int bufferSize) noexcept
+	{
+		const auto readPosFloor = std::floor(readPos);
+		const auto floor = static_cast<int>(readPosFloor);
+		const auto ceiling = (floor + 1) % bufferSize;
+		const auto fraction = readPos - readPosFloor;
+		return bufferChannel[floor] + fraction * (bufferChannel[ceiling] - bufferChannel[floor]);
+	}
+}
+
 namespace dsp
 {
 	template<typename T>
@@ -137,7 +149,7 @@ namespace dsp
 			delayTimeSmooth(0.f),
 			writeHead(),
 			delayLength(0.f),
-			ringBufferSize(1001)
+			ringBufferSize(51)
 		{}
 
 		void prepare(double _sampleRate, int blockSize, double bufferLengthInMs)
@@ -152,7 +164,7 @@ namespace dsp
 
 			writeHead.prepare(blockSize, ringBufferSize);
 			parameterBufferLength.resize(blockSize);
-			Smooth::makeFromDecayInMs(delayTimeSmooth, 500.f, sampleRate);
+			Smooth::makeFromDecayInMs(delayTimeSmooth, 2000.f, sampleRate);
 		}
 
 		void updateParameters(float _delayLength)
@@ -189,7 +201,7 @@ namespace dsp
 					*/ 
 					auto readPos = static_cast<float>(writePos) - parameterBufferLength[sample];
 					if (readPos < 0.f) readPos += ringBufferSize;
-					samplesSingleChannel[sample] += ringBufferSingleChannel[static_cast<int>(readPos)];
+					samplesSingleChannel[sample] = interpolation::linearInterpolation(ringBufferSingleChannel, readPos, ringBufferSize);
 				}
 			}
 		}

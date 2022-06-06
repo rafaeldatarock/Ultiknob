@@ -97,7 +97,7 @@ void UltiknobAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
 {
     // bufferLengthInMs should be at least 1 greater than the maximum slider value the user can set
     // if slider is set to exactly the maximum buffersize, the delay has no effect
-    delay.prepare(sampleRate, samplesPerBlock, 1001.);
+    delay.prepare(sampleRate, samplesPerBlock, 51.);
 }
 
 void UltiknobAudioProcessor::releaseResources()
@@ -180,7 +180,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.f, 1'000.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.f, 50.0f, 0.0f));
 
     return { params.begin(), params.end() };
 }

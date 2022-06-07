@@ -141,7 +141,8 @@ void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     cutFilters.processBlock(
         juce::dsp::AudioBlock<float>(buffer),
         buffer.getNumChannels(),
-        buffer.getNumSamples()
+        buffer.getNumSamples(),
+        getSampleRate()
     );
 
     delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
@@ -198,7 +199,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
 
     layout.add(std::make_unique<juce::AudioParameterFloat>("HIGHCUT",
         "HighCut Freq",
-        juce::NormalisableRange<float>(12000.f, 20000.f, 1.f, 0.5f),
+        juce::NormalisableRange<float>(8000.f, 20000.f, 1.f, 0.5f),
         20000.f));
 
     return layout;

@@ -134,8 +134,17 @@ bool UltiknobAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
 
 void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
+    cutFilters.updateParameters(
+        params.getRawParameterValue("LOWCUT")->load(), 
+        params.getRawParameterValue("HIGHCUT")->load()
+    );
+    cutFilters.processBlock(
+        juce::dsp::AudioBlock<float>(buffer),
+        buffer.getNumChannels(),
+        buffer.getNumSamples()
+    );
 
+    delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
     delay.processBlock(
         buffer.getArrayOfWritePointers(),
         buffer.getNumChannels(),

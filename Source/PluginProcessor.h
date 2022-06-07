@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Delay.h"
+#include "Filters.h"
 #include <JuceHeader.h>
 
 //==============================================================================
@@ -59,6 +60,8 @@ private:
     juce::AudioProcessorValueTreeState params;
 
     dsp::Delay delay;
+
+    dsp::CutFilters cutFilters;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (UltiknobAudioProcessor)

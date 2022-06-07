@@ -134,8 +134,18 @@ bool UltiknobAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
 
 void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
+    cutFilters.updateParameters(
+        params.getRawParameterValue("LOWCUT")->load(), 
+        params.getRawParameterValue("HIGHCUT")->load()
+    );
+    cutFilters.processBlock(
+        juce::dsp::AudioBlock<float>(buffer),
+        buffer.getNumChannels(),
+        buffer.getNumSamples(),
+        getSampleRate()
+    );
 
+    delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
     delay.processBlock(
         buffer.getArrayOfWritePointers(),
         buffer.getNumChannels(),
@@ -178,9 +188,19 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 
 juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::createParameters()
 {
-    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.f, 50.0f, 0.0f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.f, 50.0f, 0.0f));
 
-    return { params.begin(), params.end() };
+    layout.add(std::make_unique<juce::AudioParameterFloat>("LOWCUT",
+        "LowCut Freq",
+        juce::NormalisableRange<float>(20.f, 80.f, 1.f, 0.5f),
+        20.f));
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>("HIGHCUT",
+        "HighCut Freq",
+        juce::NormalisableRange<float>(8000.f, 20000.f, 1.f, 0.5f),
+        20000.f));
+
+    return layout;
 }

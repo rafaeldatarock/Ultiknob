@@ -102,6 +102,8 @@ void UltiknobAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
     // bufferLengthInMs should be at least 1 greater than the maximum slider value the user can set
     // if slider is set to exactly the maximum buffersize, the delay has no effect
     delay.prepare(sampleRate, samplesPerBlock, 51.);
+
+    compressor.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
 }
 
 void UltiknobAudioProcessor::releaseResources()
@@ -139,7 +141,7 @@ bool UltiknobAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
 void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     cutFilters.updateParameters(
-        params.getRawParameterValue("LOWCUT")->load(), 
+        params.getRawParameterValue("LOWCUT")->load(),
         params.getRawParameterValue("HIGHCUT")->load()
     );
     cutFilters.processBlock(
@@ -151,6 +153,20 @@ void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
 
     delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
     delay.processBlock(
+        buffer.getArrayOfWritePointers(),
+        buffer.getNumChannels(),
+        buffer.getNumSamples()
+    );
+
+    compressor.updateParameters(
+        params.getRawParameterValue("RATIO")->load(),
+        params.getRawParameterValue("THRESHOLD")->load(),
+        params.getRawParameterValue("ATTACK")->load(),
+        params.getRawParameterValue("RELEASE")->load(),
+        params.getRawParameterValue("INPUTGAIN")->load(),
+        params.getRawParameterValue("OUTPUTGAIN")->load()
+    );
+    compressor.processBlock(
         buffer.getArrayOfWritePointers(),
         buffer.getNumChannels(),
         buffer.getNumSamples()
@@ -217,13 +233,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
     );
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
-        "THRESHOLD",
-        "Comp Threshold",
-        juce::NormalisableRange<float>(-30.f, 0.f, 0.5f),
-        0.f)
-    );
-
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
         "RATIO",
         "Comp Ratio",
         juce::NormalisableRange<float>(1.f, 10.f, 0.1f),
@@ -231,17 +240,38 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
     );
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "THRESHOLD",
+        "Comp Threshold",
+        juce::NormalisableRange<float>(-36.f, 0.f, 0.5f),
+        0.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
         "ATTACK",
         "Comp Attack",
-        juce::NormalisableRange<float>(0.f, 1000.f, 1.f),
+        juce::NormalisableRange<float>(5.f, 200.f, 1.f),
         20.f)
     );
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
-        "Release",
+        "RELEASE",
         "Comp Release",
-        juce::NormalisableRange<float>(0.f, 1000.f, 1.f),
+        juce::NormalisableRange<float>(20.f, 600.f, 1.f),
         100.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "INPUTGAIN",
+        "Comp Input level",
+        juce::NormalisableRange<float>(-24.f, 24.f, 0.25f, 1.f),
+        0.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "OUTPUTGAIN",
+        "Comp Output level",
+        juce::NormalisableRange<float>(-24.f, 24.f, 0.25f, 1.f),
+        0.f)
     );
 
     return layout;

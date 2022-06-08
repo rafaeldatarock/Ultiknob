@@ -10,6 +10,7 @@
 
 #include "Delay.h"
 #include "Filters.h"
+#include "Compressor.h"
 #include <JuceHeader.h>
 
 //==============================================================================
@@ -62,6 +63,8 @@ private:
     dsp::Delay delay;
 
     dsp::CutFilters cutFilters;
+
+    dsp::Compressor compressor;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (UltiknobAudioProcessor)

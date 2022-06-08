@@ -21,7 +21,9 @@ UltiknobAudioProcessor::UltiknobAudioProcessor()
                      #endif
                        ),
     params (*this, nullptr, "Parameters", createParameters()),
-    delay()
+    delay(),
+    cutFilters(),
+    compressor()
 #endif
 {
 }
@@ -95,6 +97,8 @@ void UltiknobAudioProcessor::changeProgramName (int index, const juce::String& n
 //==============================================================================
 void UltiknobAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    cutFilters.prepare(sampleRate, samplesPerBlock);
+
     // bufferLengthInMs should be at least 1 greater than the maximum slider value the user can set
     // if slider is set to exactly the maximum buffersize, the delay has no effect
     delay.prepare(sampleRate, samplesPerBlock, 51.);
@@ -190,17 +194,55 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    layout.add(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.f, 50.0f, 0.0f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "DELAYTIME", 
+        "Delay Time", 
+        0.f, 
+        50.0f, 
+        0.0f)
+    );
 
-    layout.add(std::make_unique<juce::AudioParameterFloat>("LOWCUT",
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "LOWCUT",
         "LowCut Freq",
         juce::NormalisableRange<float>(20.f, 80.f, 1.f, 0.5f),
-        20.f));
+        20.f)
+    );
 
-    layout.add(std::make_unique<juce::AudioParameterFloat>("HIGHCUT",
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "HIGHCUT",
         "HighCut Freq",
         juce::NormalisableRange<float>(8000.f, 20000.f, 1.f, 0.5f),
-        20000.f));
+        20000.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "THRESHOLD",
+        "Comp Threshold",
+        juce::NormalisableRange<float>(-30.f, 0.f, 0.5f),
+        0.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "RATIO",
+        "Comp Ratio",
+        juce::NormalisableRange<float>(1.f, 10.f, 0.1f),
+        1.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "ATTACK",
+        "Comp Attack",
+        juce::NormalisableRange<float>(0.f, 1000.f, 1.f),
+        20.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "Release",
+        "Comp Release",
+        juce::NormalisableRange<float>(0.f, 1000.f, 1.f),
+        100.f)
+    );
 
     return layout;
 }

@@ -23,7 +23,8 @@ UltiknobAudioProcessor::UltiknobAudioProcessor()
     params (*this, nullptr, "Parameters", createParameters()),
     delay(),
     cutFilters(),
-    compressor()
+    compressor(),
+    random(juce::Time::currentTimeMillis())
 #endif
 {
 }
@@ -140,22 +141,39 @@ bool UltiknobAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
 
 void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+    int sampleRate = getSampleRate();
+    float** writePointerArray = buffer.getArrayOfWritePointers();
+    int numChannels = buffer.getNumChannels();
+    int numSamples = buffer.getNumSamples();
+
+    static int counter{ 0 };
+    const int maxCount{ static_cast<int>( (sampleRate / numSamples) / 0.5 ) }; // change value once every 2 seconds
+
     cutFilters.updateParameters(
         params.getRawParameterValue("LOWCUT")->load(),
         params.getRawParameterValue("HIGHCUT")->load()
     );
     cutFilters.processBlock(
         juce::dsp::AudioBlock<float>(buffer),
-        buffer.getNumChannels(),
-        buffer.getNumSamples(),
-        getSampleRate()
+        numChannels,
+        numSamples,
+        sampleRate
     );
-
-    delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
+        
+    if (counter < maxCount)
+    {
+        counter += 1;
+    }
+    else
+    {
+        delay.updateParameters(random.nextFloat() * 40.f); // nextFloat() returns float between 0. and 1. so scale to linearly to between 0. and 40.
+        counter = 0;
+    }
+    //delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
     delay.processBlock(
-        buffer.getArrayOfWritePointers(),
-        buffer.getNumChannels(),
-        buffer.getNumSamples()
+        writePointerArray,
+        numChannels,
+        numSamples
     );
 
     compressor.updateParameters(
@@ -167,9 +185,9 @@ void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         params.getRawParameterValue("OUTPUTGAIN")->load()
     );
     compressor.processBlock(
-        buffer.getArrayOfWritePointers(),
-        buffer.getNumChannels(),
-        buffer.getNumSamples()
+        writePointerArray,
+        numChannels,
+        numSamples
     );
 }
 

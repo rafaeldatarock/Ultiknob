@@ -72,7 +72,7 @@ namespace dsp
 
 			writeHead.prepare(blockSize, ringBufferSize);
 			parameterBufferLength.resize(blockSize);
-			utils::Smooth::makeFromDecayInMs(delayTimeSmooth, 2000.f, sampleRate);
+			utils::Smooth::makeFromDecayInSecs(delayTimeSmooth, 5.f, sampleRate);
 		}
 
 		void updateParameters(float _delayLength)

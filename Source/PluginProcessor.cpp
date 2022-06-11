@@ -20,8 +20,10 @@ UltiknobAudioProcessor::UltiknobAudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
-    params (*this, nullptr, "Parameters", createParameters()),
-    delay()
+    delay(),
+    cutFilters(),
+    compressor(),
+    random(juce::Time::currentTimeMillis())
 #endif
 {
 }
@@ -95,9 +97,13 @@ void UltiknobAudioProcessor::changeProgramName (int index, const juce::String& n
 //==============================================================================
 void UltiknobAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    cutFilters.prepare(sampleRate, samplesPerBlock);
+
     // bufferLengthInMs should be at least 1 greater than the maximum slider value the user can set
     // if slider is set to exactly the maximum buffersize, the delay has no effect
     delay.prepare(sampleRate, samplesPerBlock, 51.);
+
+    compressor.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
 }
 
 void UltiknobAudioProcessor::releaseResources()
@@ -134,22 +140,69 @@ bool UltiknobAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
 
 void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+    int sampleRate = getSampleRate();
+    float** writePointerArray = buffer.getArrayOfWritePointers();
+    int numChannels = buffer.getNumChannels();
+    int numSamples = buffer.getNumSamples();
+
+    // Filtering
     cutFilters.updateParameters(
-        params.getRawParameterValue("LOWCUT")->load(), 
+        params.getRawParameterValue("LOWCUT")->load(),
         params.getRawParameterValue("HIGHCUT")->load()
     );
     cutFilters.processBlock(
         juce::dsp::AudioBlock<float>(buffer),
-        buffer.getNumChannels(),
-        buffer.getNumSamples(),
-        getSampleRate()
+        numChannels,
+        numSamples,
+        sampleRate
+    );
+    
+    // Speed fluctiation
+    static int counter{ 0 };
+    const int maxCount{ static_cast<int>( (sampleRate / numSamples) / 0.5 ) }; // change value once every 2 seconds
+    const float maxDelayTime{ params.getRawParameterValue("DELAYTIME")->load() };
+    if (counter < maxCount)
+    {
+        counter += 1;
+    }
+    else
+    {
+        delay.updateParameters(random.nextFloat() * maxDelayTime); // nextFloat() returns float between 0. and 1. so scale to linearly to between 0. and 40.
+        counter = 0;
+    }
+    delay.processBlock(
+        writePointerArray,
+        numChannels,
+        numSamples
     );
 
-    delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
-    delay.processBlock(
-        buffer.getArrayOfWritePointers(),
-        buffer.getNumChannels(),
-        buffer.getNumSamples()
+    // Compression
+    bool isDirty{ static_cast<bool>(params.getRawParameterValue("DIRTYMODE")->load()) };
+    if (isDirty) {
+        compressor.updateParameters(
+            params.getRawParameterValue("RATIO")->load(),
+            params.getRawParameterValue("THRESHOLD")->load(),
+            5.f,    // ATTACK
+            20.f,   // RELEASE
+            params.getRawParameterValue("INPUTGAIN")->load(),
+            params.getRawParameterValue("OUTPUTGAIN")->load()
+        );
+    }
+    else
+    {
+        compressor.updateParameters(
+            params.getRawParameterValue("RATIO")->load(),
+            params.getRawParameterValue("THRESHOLD")->load(),
+            20.f,   // ATTACK
+            100.f,  // RELEASE
+            params.getRawParameterValue("INPUTGAIN")->load(),
+            params.getRawParameterValue("OUTPUTGAIN")->load()
+        );
+    }
+    compressor.processBlock(
+        writePointerArray,
+        numChannels,
+        numSamples
     );
 }
 
@@ -161,8 +214,8 @@ bool UltiknobAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* UltiknobAudioProcessor::createEditor()
 {
-    return new juce::GenericAudioProcessorEditor(*this);
-    //return new UltiknobAudioProcessorEditor (*this);
+    //return new juce::GenericAudioProcessorEditor(*this);
+    return new UltiknobAudioProcessorEditor (*this);
 }
 
 //==============================================================================
@@ -171,12 +224,35 @@ void UltiknobAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
+    
+    juce::MemoryOutputStream mos(destData, true);
+    params.state.writeToStream(mos);
 }
 
 void UltiknobAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+
+    auto tree = juce::ValueTree::readFromData(data, sizeInBytes);
+    if ( tree.isValid() )
+    {
+        params.replaceState(tree);
+
+        cutFilters.updateParameters(
+            params.getRawParameterValue("LOWCUT")->load(),
+            params.getRawParameterValue("HIGHCUT")->load()
+        );
+
+        compressor.updateParameters(
+            params.getRawParameterValue("RATIO")->load(),
+            params.getRawParameterValue("THRESHOLD")->load(),
+            params.getRawParameterValue("ATTACK")->load(),
+            params.getRawParameterValue("RELEASE")->load(),
+            params.getRawParameterValue("INPUTGAIN")->load(),
+            params.getRawParameterValue("OUTPUTGAIN")->load()
+        );
+    }
 }
 
 //==============================================================================
@@ -190,17 +266,83 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    layout.add(std::make_unique<juce::AudioParameterFloat>("DELAYTIME", "Delay Time", 0.f, 50.0f, 0.0f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "PERCENTAGE",
+        "Effect Percentage",
+        0.f,
+        100.0f,
+        0.0f)
+    );
 
-    layout.add(std::make_unique<juce::AudioParameterFloat>("LOWCUT",
+    layout.add(std::make_unique<juce::AudioParameterBool>(
+        "DIRTYMODE",
+        "Dirty Mode",
+        false)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "DELAYTIME", 
+        "Delay Time", 
+        0.f, 
+        40.0f,
+        0.0f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "LOWCUT",
         "LowCut Freq",
         juce::NormalisableRange<float>(20.f, 80.f, 1.f, 0.5f),
-        20.f));
+        20.f)
+    );
 
-    layout.add(std::make_unique<juce::AudioParameterFloat>("HIGHCUT",
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "HIGHCUT",
         "HighCut Freq",
         juce::NormalisableRange<float>(8000.f, 20000.f, 1.f, 0.5f),
-        20000.f));
+        20000.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "RATIO",
+        "Comp Ratio",
+        juce::NormalisableRange<float>(1.f, 10.f, 0.1f),
+        10.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "THRESHOLD",
+        "Comp Threshold",
+        juce::NormalisableRange<float>(-36.f, 0.f, 0.5f),
+        -18.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "ATTACK",
+        "Comp Attack",
+        juce::NormalisableRange<float>(5.f, 200.f, 1.f),
+        20.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "RELEASE",
+        "Comp Release",
+        juce::NormalisableRange<float>(20.f, 600.f, 1.f),
+        100.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "INPUTGAIN",
+        "Comp Input level",
+        juce::NormalisableRange<float>(-24.f, 24.f, 0.25f, 1.f),
+        0.f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "OUTPUTGAIN",
+        "Comp Output level",
+        juce::NormalisableRange<float>(-24.f, 24.f, 0.25f, 1.f),
+        0.f)
+    );
 
     return layout;
 }

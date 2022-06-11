@@ -10,12 +10,13 @@
 
 #include "Delay.h"
 #include "Filters.h"
+#include "Compressor.h"
 #include <JuceHeader.h>
 
 //==============================================================================
 /**
 */
-class UltiknobAudioProcessor : public juce::AudioProcessor
+class UltiknobAudioProcessor :  public juce::AudioProcessor
 {
 public:
     //==============================================================================
@@ -55,13 +56,18 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
-    juce::AudioProcessorValueTreeState params;
+    juce::AudioProcessorValueTreeState params{ *this, nullptr, "Parameters", createParameters() };
 
+
+private:
     dsp::Delay delay;
 
     dsp::CutFilters cutFilters;
+
+    dsp::Compressor compressor;
+
+    juce::Random random;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (UltiknobAudioProcessor)

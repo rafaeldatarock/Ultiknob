@@ -16,7 +16,7 @@
 //==============================================================================
 /**
 */
-class UltiknobAudioProcessor : public juce::AudioProcessor
+class UltiknobAudioProcessor :  public juce::AudioProcessor
 {
 public:
     //==============================================================================
@@ -56,10 +56,11 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
-    juce::AudioProcessorValueTreeState params;
+    juce::AudioProcessorValueTreeState params{ *this, nullptr, "Parameters", createParameters() };
 
+
+private:
     dsp::Delay delay;
 
     dsp::CutFilters cutFilters;

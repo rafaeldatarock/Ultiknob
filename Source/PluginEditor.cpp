@@ -12,18 +12,36 @@
 //==============================================================================
 UltiknobAudioProcessorEditor::UltiknobAudioProcessorEditor (UltiknobAudioProcessor& p)
     : AudioProcessorEditor (&p), 
-    audioProcessor (p), 
+    audioProcessor (p),
     ultiknob(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag, juce::Slider::TextEntryBoxPosition::NoTextBox),
     inputGain(juce::Slider::SliderStyle::LinearVertical, juce::Slider::TextEntryBoxPosition::TextBoxBelow),
     outputGain(juce::Slider::SliderStyle::LinearVertical, juce::Slider::TextEntryBoxPosition::TextBoxBelow),
-    dirtyMode("Dirty Mode", "Make it dirty!")
+    dirtyMode("Dirty Mode"),
+    inputGainAttachment(audioProcessor.params, "INPUTGAIN", inputGain),
+    outputGainAttachment(audioProcessor.params, "OUTPUTGAIN", outputGain),
+    ultiknobAttachment(audioProcessor.params, "PERCENTAGE", ultiknob),
+    dirtyModeAttachment(audioProcessor.params, "DIRTYMODE", dirtyMode)
 {
+    ultiknob.setTextValueSuffix(" %");
+    ultiknob.addListener(this);
+
+    inputGain.setTextValueSuffix(" dB");
+    outputGain.setTextValueSuffix(" dB");
+
+    inputGainLabel.setText("Input Volume", juce::dontSendNotification);
+    inputGainLabel.attachToComponent(&inputGain, false);
+    outputGainLabel.setText("Output Volume", juce::dontSendNotification);
+    outputGainLabel.attachToComponent(&outputGain, false);
+
     addAndMakeVisible(ultiknob);
     addAndMakeVisible(inputGain);
     addAndMakeVisible(outputGain);
     addAndMakeVisible(dirtyMode);
-    
-    setSize (400, 600);
+
+    addAndMakeVisible(inputGainLabel);
+    addAndMakeVisible(outputGainLabel);
+
+    setSize (480, 600);
 }
 
 UltiknobAudioProcessorEditor::~UltiknobAudioProcessorEditor()
@@ -42,6 +60,8 @@ void UltiknobAudioProcessorEditor::paint (juce::Graphics& g)
 
     g.setFont(14.f);
     g.drawFittedText ("DataRock Studio, 2022", footerArea, juce::Justification::centredLeft, 1);
+
+    // Colour palette: https://coolors.co/ffffff-848c8e-435058-fcc200-d34e24
 }
 
 void UltiknobAudioProcessorEditor::resized()
@@ -58,3 +78,22 @@ void UltiknobAudioProcessorEditor::resized()
     outputGain.setBounds(bounds.removeFromRight(bounds.getWidth() * 0.333333333));
     ultiknob.setBounds(bounds);
 }
+
+void UltiknobAudioProcessorEditor::sliderValueChanged(juce::Slider* slider)
+{
+    double percentage{ slider->getValue() };
+
+    audioProcessor.params.getRawParameterValue("DELAYTIME")->store(percentage * 0.4f);
+    audioProcessor.params.getRawParameterValue("RATIO")->store(1.f + (percentage * 0.09f));
+
+    if (dirtyMode.getToggleState() == false)
+    {
+        audioProcessor.params.getRawParameterValue("LOWCUT")->store(20.f + (percentage * 0.40f));
+        audioProcessor.params.getRawParameterValue("HIGHCUT")->store(20'000.f - (percentage * 80.f));
+    }
+    else {
+        audioProcessor.params.getRawParameterValue("LOWCUT")->store(20.f + (percentage * 0.60f));
+        audioProcessor.params.getRawParameterValue("HIGHCUT")->store(20'000.f - (percentage * 120.f));
+    }
+}
+

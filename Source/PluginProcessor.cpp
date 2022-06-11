@@ -20,7 +20,6 @@ UltiknobAudioProcessor::UltiknobAudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
-    params (*this, nullptr, "Parameters", createParameters()),
     delay(),
     cutFilters(),
     compressor(),
@@ -146,9 +145,7 @@ void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     int numChannels = buffer.getNumChannels();
     int numSamples = buffer.getNumSamples();
 
-    static int counter{ 0 };
-    const int maxCount{ static_cast<int>( (sampleRate / numSamples) / 0.5 ) }; // change value once every 2 seconds
-
+    // Filtering
     cutFilters.updateParameters(
         params.getRawParameterValue("LOWCUT")->load(),
         params.getRawParameterValue("HIGHCUT")->load()
@@ -159,31 +156,49 @@ void UltiknobAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         numSamples,
         sampleRate
     );
-        
+    
+    // Speed fluctiation
+    static int counter{ 0 };
+    const int maxCount{ static_cast<int>( (sampleRate / numSamples) / 0.5 ) }; // change value once every 2 seconds
+    const float maxDelayTime{ params.getRawParameterValue("DELAYTIME")->load() };
     if (counter < maxCount)
     {
         counter += 1;
     }
     else
     {
-        delay.updateParameters(random.nextFloat() * 40.f); // nextFloat() returns float between 0. and 1. so scale to linearly to between 0. and 40.
+        delay.updateParameters(random.nextFloat() * maxDelayTime); // nextFloat() returns float between 0. and 1. so scale to linearly to between 0. and 40.
         counter = 0;
     }
-    //delay.updateParameters(params.getRawParameterValue("DELAYTIME")->load());
     delay.processBlock(
         writePointerArray,
         numChannels,
         numSamples
     );
 
-    compressor.updateParameters(
-        params.getRawParameterValue("RATIO")->load(),
-        params.getRawParameterValue("THRESHOLD")->load(),
-        params.getRawParameterValue("ATTACK")->load(),
-        params.getRawParameterValue("RELEASE")->load(),
-        params.getRawParameterValue("INPUTGAIN")->load(),
-        params.getRawParameterValue("OUTPUTGAIN")->load()
-    );
+    // Compression
+    bool isDirty{ static_cast<bool>(params.getRawParameterValue("DIRTYMODE")->load()) };
+    if (isDirty) {
+        compressor.updateParameters(
+            params.getRawParameterValue("RATIO")->load(),
+            params.getRawParameterValue("THRESHOLD")->load(),
+            5.f,    // ATTACK
+            20.f,   // RELEASE
+            params.getRawParameterValue("INPUTGAIN")->load(),
+            params.getRawParameterValue("OUTPUTGAIN")->load()
+        );
+    }
+    else
+    {
+        compressor.updateParameters(
+            params.getRawParameterValue("RATIO")->load(),
+            params.getRawParameterValue("THRESHOLD")->load(),
+            20.f,   // ATTACK
+            100.f,  // RELEASE
+            params.getRawParameterValue("INPUTGAIN")->load(),
+            params.getRawParameterValue("OUTPUTGAIN")->load()
+        );
+    }
     compressor.processBlock(
         writePointerArray,
         numChannels,
@@ -251,13 +266,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    //layout.add(std::make_unique<juce::AudioParameterFloat>(
-    //    "DELAYTIME", 
-    //    "Delay Time", 
-    //    0.f, 
-    //    50.0f, 
-    //    0.0f)
-    //);
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "PERCENTAGE",
+        "Effect Percentage",
+        0.f,
+        100.0f,
+        0.0f)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterBool>(
+        "DIRTYMODE",
+        "Dirty Mode",
+        false)
+    );
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        "DELAYTIME", 
+        "Delay Time", 
+        0.f, 
+        40.0f,
+        0.0f)
+    );
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         "LOWCUT",
@@ -277,14 +306,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
         "RATIO",
         "Comp Ratio",
         juce::NormalisableRange<float>(1.f, 10.f, 0.1f),
-        1.f)
+        10.f)
     );
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         "THRESHOLD",
         "Comp Threshold",
         juce::NormalisableRange<float>(-36.f, 0.f, 0.5f),
-        0.f)
+        -18.f)
     );
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(

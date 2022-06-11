@@ -199,8 +199,8 @@ bool UltiknobAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* UltiknobAudioProcessor::createEditor()
 {
-    return new juce::GenericAudioProcessorEditor(*this);
-    //return new UltiknobAudioProcessorEditor (*this);
+    //return new juce::GenericAudioProcessorEditor(*this);
+    return new UltiknobAudioProcessorEditor (*this);
 }
 
 //==============================================================================
@@ -209,12 +209,35 @@ void UltiknobAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
+    
+    juce::MemoryOutputStream mos(destData, true);
+    params.state.writeToStream(mos);
 }
 
 void UltiknobAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+
+    auto tree = juce::ValueTree::readFromData(data, sizeInBytes);
+    if ( tree.isValid() )
+    {
+        params.replaceState(tree);
+
+        cutFilters.updateParameters(
+            params.getRawParameterValue("LOWCUT")->load(),
+            params.getRawParameterValue("HIGHCUT")->load()
+        );
+
+        compressor.updateParameters(
+            params.getRawParameterValue("RATIO")->load(),
+            params.getRawParameterValue("THRESHOLD")->load(),
+            params.getRawParameterValue("ATTACK")->load(),
+            params.getRawParameterValue("RELEASE")->load(),
+            params.getRawParameterValue("INPUTGAIN")->load(),
+            params.getRawParameterValue("OUTPUTGAIN")->load()
+        );
+    }
 }
 
 //==============================================================================
@@ -228,13 +251,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-        "DELAYTIME", 
-        "Delay Time", 
-        0.f, 
-        50.0f, 
-        0.0f)
-    );
+    //layout.add(std::make_unique<juce::AudioParameterFloat>(
+    //    "DELAYTIME", 
+    //    "Delay Time", 
+    //    0.f, 
+    //    50.0f, 
+    //    0.0f)
+    //);
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         "LOWCUT",

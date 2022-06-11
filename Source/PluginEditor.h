@@ -29,5 +29,13 @@ private:
     // access the processor object that created it.
     UltiknobAudioProcessor& audioProcessor;
 
+    juce::Slider ultiknob;
+    juce::Slider inputGain;
+    juce::Slider outputGain;
+    juce::TextButton dirtyMode;
+
+    juce::Rectangle<int> logoArea;
+    juce::Rectangle<int> footerArea;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (UltiknobAudioProcessorEditor)
 };

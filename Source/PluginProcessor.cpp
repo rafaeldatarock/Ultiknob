@@ -306,7 +306,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout UltiknobAudioProcessor::crea
         "RATIO",
         "Comp Ratio",
         juce::NormalisableRange<float>(1.f, 10.f, 0.1f),
-        10.f)
+        1.f)
     );
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(

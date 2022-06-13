@@ -52,9 +52,24 @@ UltiknobAudioProcessorEditor::~UltiknobAudioProcessorEditor()
 void UltiknobAudioProcessorEditor::paint (juce::Graphics& g)
 {
     // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+    getLookAndFeel().setColour(0, juce::Colour(55, 55, 55));    // Gunmetal
+    getLookAndFeel().setColour(1, juce::Colour(67, 80, 88));    // Charcoal
+    getLookAndFeel().setColour(2, juce::Colour(132, 140, 142)); // Grey
+    getLookAndFeel().setColour(3, juce::Colour(255, 255, 255)); // White
+    getLookAndFeel().setColour(10, juce::Colour(252, 194, 0));  // Yellow
+    getLookAndFeel().setColour(11, juce::Colour(211, 78, 36));  // Dark Orange
+    getLookAndFeel().setColour(20, juce::Colour(20, 20, 20));   // Black
 
-    g.setColour (juce::Colours::white);
+    getLookAndFeel().setColour(juce::Slider::thumbColourId, getLookAndFeel().findColour(10));
+    getLookAndFeel().setColour(juce::Slider::trackColourId, getLookAndFeel().findColour(2));
+    getLookAndFeel().setColour(juce::Slider::backgroundColourId, getLookAndFeel().findColour(0));
+    getLookAndFeel().setColour(juce::Slider::rotarySliderOutlineColourId, getLookAndFeel().findColour(0));
+    getLookAndFeel().setColour(juce::Slider::rotarySliderFillColourId, getLookAndFeel().findColour(2));
+
+    g.setColour(getLookAndFeel().findColour(20));
+    g.fillRect(getLocalBounds());
+
+    g.setColour (getLookAndFeel().findColour (3));
     g.setFont (48.f);
     g.drawFittedText("Ultiknob", logoArea, juce::Justification::centred, 1);
 
@@ -70,7 +85,9 @@ void UltiknobAudioProcessorEditor::resized()
     // subcomponents in your editor..
 
     auto bounds = getLocalBounds();
-    logoArea = bounds.removeFromTop(bounds.getHeight() * 0.30);
+    bounds.removeFromLeft(bounds.getWidth() * 0.08);
+    bounds.removeFromRight(bounds.getWidth() * 0.08);
+    logoArea = bounds.removeFromTop(bounds.getHeight() * 0.25);
     footerArea = bounds.removeFromBottom(bounds.getHeight() * 0.20);
 
     dirtyMode.setBounds(bounds.removeFromBottom(bounds.getHeight() * 0.20));
